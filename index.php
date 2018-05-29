@@ -55,6 +55,12 @@
             // Execute cURL on the session handle
             $response = curl_exec($session);
             
+            // Capture any cURL errors
+            if ($response === false) {
+              $curl_error = curl_error($session);
+            }
+
+            // Capture the HTTP status code from the API
             $http_status_code = curl_getinfo($session, CURLINFO_HTTP_CODE);
 
             // Close the cURL session
@@ -62,11 +68,21 @@
             
             if ($http_status_code != 200) {
                 
-                // Triggered if API does not return 200 HTTP code
-                // More info - https://developers.alliescomputing.com/postcoder-web-api/error-handling
-                
-                // Here we will output a basic message with HTTP code
-                $output->error_message = "An error occurred - " . $http_status_code;
+                if ($curl_error) {
+
+                    // Triggered if cURL failed for some reason
+                    // Output the error captured by curl_error()
+                    $output->error_message = "cURL error occurred - " . $curl_error;
+
+                } else {
+
+                    // Triggered if API does not return 200 HTTP code
+                    // More info - https://developers.alliescomputing.com/postcoder-web-api/error-handling
+
+                    // Here we will output a basic message with HTTP code
+                    $output->error_message = "HTTP error occurred - " . $http_status_code;
+
+                }
                 
             } else {
                 
