@@ -75,13 +75,15 @@ function search_address($input = "", $country_code = "GB", $page = 0)
 
 				// Triggered if cURL failed for some reason
 				// Output the error captured by curl_error()
+				http_response_code(500);
 				$output->error_message = "cURL error occurred - " . $curl_error;
 			} else {
 
 				// Triggered if API does not return 200 HTTP code
-				// More info - https://developers.alliescomputing.com/postcoder-web-api/error-handling
+				// More info - https://postcoder.com/docs/error-handling
 
 				// Here we will output a basic message with HTTP code
+				http_response_code($http_status_code);
 				$output->error_message = "HTTP error occurred - " . $http_status_code;
 			}
 		} else {
