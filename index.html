@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Allies PHP Example</title>
+		<!-- Bootstrap -->
+		<link
+			rel="stylesheet"
+			href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+			integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+			crossorigin="anonymous"
+		/>
+		<link
+			href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
+			rel="stylesheet"
+			type="text/css"
+		/>
+		<!--  Fonts-->
+		<link
+			href="https://fonts.googleapis.com/css?family=Barlow|Raleway:400,600,800&display=swap"
+			rel="stylesheet"
+		/>
+	</head>
+	<body>
+		<div class="row">
+			<div class="col-xs-12">
+				<h1>Address lookup with Javascript & PHP</h1>
+
+				<p>
+					Simple demo to search for addresses via a PHP script.
+				</p>
+
+				<p>
+					<a href="https://postcoder.com/docs/address-lookup"
+						>Full address lookup API documentation</a
+					>
+				</p>
+
+				<br />
+				<hr />
+				<br />
+
+				<form id="example_form">
+					<div class="address_container">
+						<div class="form-group">
+							<label for="address">Search for address or postcode</label>
+							<input
+								type="text"
+								class="form-control"
+								id="address"
+								placeholder="e.g. Manor Farm Barns, Framingham Pigot or NR14 7PZ"
+								aria-owns="address_result"
+								autocomplete="off"
+								autocorrect="off"
+							/>
+						</div>
+						<button type="submit" class="btn btn-default" id="search">
+							Search
+						</button>
+						<div
+							id="address_status"
+							aria-live="assertive"
+							aria-atomic="true"
+							role="status"
+							class="sr-only"
+						></div>
+						<div id="address_results"></div>
+					</div>
+				</form>
+
+				<br />
+				<hr />
+				<br />
+
+				<form id="output_form">
+					<div class="form-group">
+						<label for="address_line_1">Address line 1</label>
+						<input type="text" class="form-control" id="address_line_1" />
+					</div>
+					<div class="form-group">
+						<label for="address_line_2">Address line 2</label>
+						<input type="text" class="form-control" id="address_line_2" />
+					</div>
+					<div class="form-group">
+						<label for="posttown">Post town</label>
+						<input type="text" class="form-control" id="posttown" />
+					</div>
+					<div class="form-group">
+						<label for="postcode">Postcode</label>
+						<input type="text" class="form-control" id="postcode" />
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<script>
+			var example_form = document.getElementById("example_form");
+
+			example_form.addEventListener("submit", function(e) {
+				e.preventDefault();
+
+				// The field we will use for search term input
+				var address = document.getElementById("address");
+
+				// Where we will put our search results
+				var address_results = document.getElementById("address_results");
+
+				// Accessible status messages for assistive technologies like screen readers
+				var address_status = document.getElementById("address_status");
+
+				address_search(address, address_results, address_status);
+			});
+
+			function address_search(
+				input_element,
+				address_results,
+				status_element,
+				page
+			) {
+				var page = page || 0;
+
+				var address = input_element.value.trim();
+
+				if (address != "") {
+					// Remove any previous validation results
+					if (page == 0) address_results.innerHTML = "";
+
+					// Create a loading message
+					var loading_html = document.createElement("div");
+					loading_html.setAttribute("id", "address_loading");
+					loading_html.textContent = "Searching addresses...";
+
+					address_results.insertAdjacentElement("afterend", loading_html);
+
+					status_element.textContent = "Searching addresses";
+
+					// Create the URL to API including API key and encoded search term
+					var address_url =
+						"/address-lookup.php?input=" + address + "&page=" + page;
+
+					// Call the API
+					var address_request = new XMLHttpRequest();
+					address_request.open("GET", address_url, true);
+
+					address_request.onload = function() {
+						if (address_request.status >= 200 && address_request.status < 400) {
+							loading_html.remove();
+							address_results.innerHTML = "";
+
+							var data = JSON.parse(address_request.response);
+
+							// For only one result, simply populate the fields, rather than asking the user to select from list
+							if (data.num_of_addresses == 1) {
+								select_address(
+									data.addresses[0],
+									address_results,
+									status_element
+								);
+
+								status_element.textContent =
+									'"' +
+									data.addresses[0].summaryline +
+									'" selected, address fields below populated';
+							} else if (data.addresses.length > 1) {
+								// Produce the <select> element and a label
+								var select_label = document.createElement("label");
+								var select_element = document.createElement("select");
+
+								select_element.id = "addressSelect";
+								select_element.className = "form-control form-control-lg";
+								select_label.htmlFor = "addressSelect";
+								select_label.textContent = "Choose an address";
+
+								// Give the select element a listener function that is passed the address data for that option
+								select_element.addEventListener(
+									"change",
+									(function(item) {
+										return function(event) {
+											if (event.target.value === "morePlease") {
+												// Here we handle a request for more addresses
+												// (if more than 100 were returned from the search)
+												// More details on that later
+												address_search(
+													input_element,
+													address_results,
+													status_element,
+													data.addresses[data.addresses.length - 1].nextpage
+												);
+											} else {
+												select_address(
+													data.addresses[event.target.value],
+													address_results,
+													status_element
+												);
+											}
+										};
+									})(data)
+								);
+
+								address_results.appendChild(select_label);
+								address_results.appendChild(select_element);
+
+								// Fill it with <option>s
+								for (var i = 0; i < data.addresses.length; i++) {
+									// Add a placeholder if first option
+									if (i === 0) {
+										var address_option = new Option(
+											"Select an address...",
+											null
+										);
+										select_element.appendChild(address_option);
+									}
+
+									// Text for each option is the summaryline, the value is just the index of the loop
+									var address_option = new Option(
+										data.addresses[i].summaryline,
+										i
+									);
+									select_element.appendChild(address_option);
+								}
+
+								// Check if we have more than one page of results (Slight edge case)
+								// Either let your user page through the results using a button or
+								// show a message to encourage them to refine their search.
+								// Typically adding a house number or name along with postcode helps
+
+								var last_index = data.addresses.length - 1;
+
+								if (data.addresses[last_index].morevalues) {
+									// Create another select option and add some context to text, using totalresults element
+									var show_more_option = new Option(
+										data.addresses[last_index].totalresults +
+											" addresses found, click to show next 100",
+										"morePlease"
+									);
+									select_element.appendChild(show_more_option);
+								} else {
+									status_element.textContent =
+										data.num_of_addresses + " addresses found";
+								}
+							} else {
+								address_results.textContent = "No addresses found";
+
+								status_element.textContent = "No addresses found";
+							}
+						} else {
+							loading_html.remove();
+
+							status_element.textContent = "Error occurred";
+
+							address_results.textContent = "Error occurred";
+
+							// Triggered if API does not return HTTP code between 200 and 399
+							// More info - https://postcoder.com/docs/error-handling
+						}
+					};
+
+					address_request.onerror = function() {
+						loading_html.remove();
+
+						status_element.textContent = "Error occurred";
+
+						address_results.textContent = "Error occurred";
+
+						// Triggered if API cannot be reached
+						// More info - https://postcoder.com/docs/error-handling
+					};
+
+					address_request.send();
+				} else {
+					// Could show an "Address search term is required" message here
+				}
+			}
+
+			function select_address(address, address_results, status_element) {
+				status_element.textContent =
+					'"' +
+					address.summaryline +
+					'" selected, address fields below populated';
+
+				// Populate fields
+				document.getElementById("address_line_1").value =
+					address.addressline1 || "";
+				document.getElementById("address_line_2").value =
+					address.addressline2 || "";
+				document.getElementById("posttown").value = address.posttown || "";
+				document.getElementById("postcode").value = address.postcode || "";
+
+				// Full list of response elements
+				// https://postcoder.com/docs/address-lookup
+			}
+		</script>
+	</body>
+</html>
